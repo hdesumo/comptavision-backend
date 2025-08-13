@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * ===================== MULTI-TENANT CORE =====================
+ */
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  country   String
+  currency  String   @default("XAF")
+  plan      String   @default("STARTER")
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users        User[]
+  clients      Client[]
+  integrations Integration[]
+  subscription Subscription?
+
+  @@map("tenants")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        String    @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+/**
+ * ===================== CLIENTS =====================
+ */
+
+model Client {
+  id             String  @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  address        String?
+  businessType   String?
+  registrationNo String?
+  taxId          String?
+
+  // Scoring & Prédictions
+  healthScore  Int?      @default(0)
+  riskLevel    String?   @default("LOW")
+  lastAnalysis DateTime?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Relations
+  financialData FinancialData[]
+  predictions   Prediction[]
+
+  @@unique([tenantId, email]) // <- unicité email par tenant
+  @@map("clients")
+}
+
+/**
+ * ===================== DONNÉES FINANCIÈRES =====================
+ */
+
+model FinancialData {
+  id         String @id @default(cuid())
+  period     String // ex: "2025-07"
+  periodType String // "MONTHLY" | "QUARTERLY" | "YEARLY"
+
+  revenue     Decimal? @db.Decimal(15, 2)
+  expenses    Decimal? @db.Decimal(15, 2)
+  assets      Decimal? @db.Decimal(15, 2)
+  liabilities Decimal? @db.Decimal(15, 2)
+  equity      Decimal? @db.Decimal(15, 2)
+  cashFlow    Decimal? @db.Decimal(15, 2)
+
+  profitMargin   Decimal? @db.Decimal(5, 2)
+  debtRatio      Decimal? @db.Decimal(5, 2)
+  liquidityRatio Decimal? @db.Decimal(5, 2)
+
+  source     String?
+  importedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, period, periodType])
+  @@map("financial_data")
+}
+
+/**
+ * ===================== PRÉDICTIONS =====================
+ */
+
+model Prediction {
+  id         String  @id @default(cuid())
+  type       String // "HEALTH_SCORE" | "CASH_FLOW" | ...
+  value      Decimal @db.Decimal(10, 2)
+  confidence Decimal @db.Decimal(3, 2) // 0.00-1.00
+  period     String
+
+  factors         Json?
+  recommendations Json?
+
+  createdAt DateTime @default(now())
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("predictions")
+}
+
+/**
+ * ===================== INTÉGRATIONS =====================
+ */
+
+model Integration {
+  id     String @id @default(cuid())
+  name   String
+  type   String // "API" | "CSV" | "EXCEL"
+  status String @default("INACTIVE")
+
+  config        Json
+  lastSync      DateTime?
+  syncFrequency String    @default("DAILY")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("integrations")
+}
+
+/**
+ * ===================== ABONNEMENTS =====================
+ */
+
+model Subscription {
+  id       String  @id @default(cuid())
+  stripeId String? @unique
+  status   String
+  plan     String
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("EUR")
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
