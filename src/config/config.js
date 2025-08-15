@@ -2,7 +2,7 @@
 require('dotenv').config();
 const path = require('path');
 
-// Version app depuis le package.json (chemin robuste en prod)
+// Version app depuis package.json (chemin robuste)
 const { version } = (() => {
   try {
     const pkg = require(path.join(__dirname, '..', '..', 'package.json'));
@@ -14,14 +14,14 @@ const { version } = (() => {
 
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
 
-// petit utilitaire pour parser les booléens d'env
+// Parse booléen d'env
 const parseBool = (v, def = false) => {
   if (typeof v !== 'string') return def;
   const s = v.trim().toLowerCase();
   return s === 'true' || s === '1' || s === 'yes';
 };
 
-// Sécurité : empêcher un démarrage prod sans secret JWT
+// Sécurité: empêcher un démarrage prod sans secret solide
 if (isProd && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change-me-in-prod')) {
   throw new Error('JWT_SECRET must be set to a strong value in production.');
 }
@@ -29,21 +29,19 @@ if (isProd && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change-me-
 module.exports = {
   app: {
     name: 'ComptaVision',
-    version: version, // ex: "1.0.0"
+    version: version,
     env: process.env.NODE_ENV || 'development',
     port: parseInt(process.env.PORT || '5000', 10),
-    // enlève un éventuel slash final pour éviter les doubles // dans les fetch
     frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, ''),
   },
   db: {
-    // support DATABASE_URL (Railway/Render) OU variables séparées
+    // Priorité à l’URL unique (Railway)
     url: process.env.DATABASE_URL || '',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     name: process.env.DB_NAME || 'comptavision_db',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    // active SSL par défaut en prod, mais surchargable via DB_SSL
     ssl: parseBool(process.env.DB_SSL || (isProd ? 'true' : 'false')),
   },
   security: {
