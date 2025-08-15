@@ -27,6 +27,7 @@ model Tenant {
   clients      Client[]
   integrations Integration[]
   subscription Subscription?
+  License      License[]
 
   @@map("tenants")
 }
@@ -184,4 +185,24 @@ model Subscription {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
+}
+
+model License {
+  id          String    @id @default(cuid())
+  licenseKey  String    @unique
+  status      String    @default("PENDING") // PENDING | ACTIVE | EXPIRED | REVOKED
+  plan        String    @default("STARTER") // STARTER | PRO | CABINET
+  seats       Int       @default(5)
+  issuedAt    DateTime  @default(now())
+  activatedAt DateTime?
+  expiresAt   DateTime
+
+  // Optionnel: lier la licence à un cabinet (tenant) après activation
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  // Tracking
+  note String?
+
+  @@map("licenses")
 }
