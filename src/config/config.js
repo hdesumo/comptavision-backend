@@ -1,6 +1,7 @@
 // config/config.js
 require('dotenv').config();
 const { version } = require('../package.json');
+const config = require('./config/config');
 
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
 
